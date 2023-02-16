@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 @SpringBootTest
-@TestPropertySource(properties = {"spring.data.mongodb.uri=mongodb://localhost/testdb"})
+@TestPropertySource(properties = {"spring.data.mongodb.uri=mongodb://localhost/testdb", "jwt.secret=secret"})
 public class ProductServiceMongoDbTest {
 
     @Mock

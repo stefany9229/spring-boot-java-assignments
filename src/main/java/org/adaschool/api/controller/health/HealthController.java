@@ -1,4 +1,4 @@
-package org.adaschool.api.controller;
+package org.adaschool.api.controller.health;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,3 +13,4 @@ public class HealthController {
     }
 
 }
+

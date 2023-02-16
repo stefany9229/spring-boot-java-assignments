@@ -1,7 +1,10 @@
 package org.adaschool.api.service.user;
 
+import org.adaschool.api.exception.UserNotFoundException;
 import org.adaschool.api.repository.user.User;
-import org.adaschool.api.repository.user.UserMongoRepository;
+import org.adaschool.api.repository.user.UserDto;
+import org.adaschool.api.repository.user.UserRepository;
+import org.adaschool.api.security.encrypt.PasswordEncryptionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -11,39 +14,48 @@ import java.util.Optional;
 @Service
 public class UsersServiceMongoDb implements UsersService {
 
-    private final UserMongoRepository userMongoRepository;
+    private final UserRepository userRepository;
+
+    private final PasswordEncryptionService passwordEncryptionService;
 
     @Autowired
-    public UsersServiceMongoDb(UserMongoRepository userMongoRepository) {
-        this.userMongoRepository = userMongoRepository;
+    public UsersServiceMongoDb(@Autowired UserRepository userRepository, @Autowired PasswordEncryptionService passwordEncryptionService) {
+        this.userRepository = userRepository;
+        this.passwordEncryptionService = passwordEncryptionService;
     }
 
     @Override
-    public User save(User user) {
-        //TODO implement this method
-        return null;
+    public User save(UserDto userDto) {
+        return userRepository.save(new User(userDto, passwordEncryptionService.encrypt(userDto.getPassword())));
     }
 
     @Override
     public Optional<User> findById(String id) {
-        //TODO implement this method
-        return Optional.empty();
+        return userRepository.findById(id);
+    }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
     }
 
     @Override
     public List<User> all() {
-        //TODO implement this method
-        return null;
+        return userRepository.findAll();
     }
 
     @Override
     public void deleteById(String id) {
-        //TODO implement this method
+        userRepository.deleteById(id);
     }
 
     @Override
-    public User update(User user, String userId) {
-        //TODO implement this method
-        return null;
+    public User update(UserDto userDto, String userId) {
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (optionalUser.isEmpty())
+            throw new UserNotFoundException(userId);
+        User user = optionalUser.get();
+        user.update(userDto);
+        return userRepository.save(user);
     }
 }

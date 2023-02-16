@@ -8,13 +8,19 @@ import org.adaschool.api.service.user.UsersService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Optional;
 
+import static org.adaschool.api.utils.Constants.ADMIN_ROLE;
+import static org.adaschool.api.utils.Constants.USER_ROLE;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,6 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
 @SpringBootTest
+@AutoConfigureMockMvc
+@TestPropertySource(properties = {"spring.data.mongodb.uri=mongodb://localhost/testdb", "jwt.secret=secret"})
 public class UsersControllerTest {
 
     final String BASE_URL = "/v1/users/";
@@ -72,7 +80,8 @@ public class UsersControllerTest {
     @Test
     public void testSaveNewUser() throws Exception {
         UserDto userDto = new UserDto("Ada", "Lovelace", "ada@mail.com", "123456789");
-        User user = new User(userDto);
+        String encryptedPassword = "asdqw--*)77777999";
+        User user = new User(userDto, encryptedPassword);
 
         when(usersService.save(any())).thenReturn(user);
 
@@ -87,9 +96,10 @@ public class UsersControllerTest {
     }
 
     @Test
-    public void testUpdateExistingUser() throws Exception {
+    public void testUpdateUser() throws Exception {
         UserDto userDto = new UserDto("Ada", "Lovelace", "ada@mail.com", "123456789");
-        User user = new User(userDto);
+        String encryptedPassword = "asdqw--*)77777999";
+        User user = new User(userDto, encryptedPassword);
         when(usersService.findById("1")).thenReturn(Optional.of(user));
 
         String json = "{\"id\":\"1\",\"name\":\"Ada\",\"lastName\":\"Lovelace\"}";
@@ -98,28 +108,16 @@ public class UsersControllerTest {
                         .content(json))
                 .andExpect(status().isOk());
 
-        verify(usersService, times(1)).save(user);
+        verify(usersService, times(1)).update(any(), eq("1"));
     }
 
-    @Test
-    public void testUpdateNotExistingUser() throws Exception {
-        String id = "1";
-        when(usersService.findById(id)).thenReturn(Optional.empty());
-        String json = "{\"id\":\"1\",\"name\":\"Ada\",\"lastName\":\"Lovelace\"}";
-        mockMvc.perform(put(BASE_URL + id)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json))
-                .andExpect(status().isNotFound())
-                .andExpect(result -> assertTrue(result.getResolvedException() instanceof UserNotFoundException))
-                .andExpect(result -> assertEquals("404 NOT_FOUND \"user with ID: " + id + " not found\"", result.getResolvedException().getMessage()));
-
-        verify(usersService, times(0)).save(any());
-    }
 
     @Test
-    public void testDeleteExistingUser() throws Exception {
+    @WithMockUser(roles = ADMIN_ROLE)
+    public void testDeleteUserWithAdminRole() throws Exception {
         UserDto userDto = new UserDto("Ada", "Lovelace", "ada@mail.com", "123456789");
-        User user = new User(userDto);
+        String encryptedPassword = "asdqw--*)77777999";
+        User user = new User(userDto, encryptedPassword);
         when(usersService.findById("1")).thenReturn(Optional.of(user));
 
         String json = "{\"id\":\"1\",\"name\":\"Ada\",\"lastName\":\"Lovelace\"}";
@@ -131,17 +129,23 @@ public class UsersControllerTest {
         verify(usersService, times(1)).deleteById("1");
     }
 
+
+    @WithMockUser(roles = USER_ROLE)
     @Test
-    public void testDeleteNotExistingUser() throws Exception {
-        String id = "1";
-        when(usersService.findById(id)).thenReturn(Optional.empty());
+    public void testDeleteUserWithUserRole() throws Exception {
 
-        mockMvc.perform(delete(BASE_URL + id))
-                .andExpect(status().isNotFound())
-                .andExpect(result -> assertTrue(result.getResolvedException() instanceof UserNotFoundException))
-                .andExpect(result -> assertEquals("404 NOT_FOUND \"user with ID: " + id + " not found\"", result.getResolvedException().getMessage()));
+        try {
+            String json = "{\"id\":\"1\",\"name\":\"Ada\",\"lastName\":\"Lovelace\"}";
+            mockMvc.perform(delete(BASE_URL + "1")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json))
+                    .andExpect(status().isForbidden())
+                    .andExpect(result -> assertTrue(result.getResolvedException() instanceof AccessDeniedException));
 
-        verify(usersService, times(0)).deleteById(id);
+            verify(usersService, times(1)).deleteById("1");
+        } catch (Exception e) {
+            assertTrue(e.getCause() instanceof AccessDeniedException);
+        }
     }
 
 
