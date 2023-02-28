@@ -72,7 +72,7 @@ public class JwtRequestFilterTest {
 
     @Test
     public void whenRequestHasValidTokenThenRespondsOK() throws Exception {
-        String validToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2M2VlNThhNzIxYjliYzc1Y2RlNzgyYTEiLCJhZGFfcm9sZXMiOlsiVVNFUiJdLCJpYXQiOjE2NzY1NjgxMzgsImV4cCI6MTY3NjY1NDUzOH0.rrvaKfwuy-PXsfUrsR9QZHJoiKxXyXWV27c11BMV9gY";
+        String validToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2M2VlNThhNzIxYjliYzc1Y2RlNzgyYTEiLCJhZGFfcm9sZXMiOlsiVVNFUiJdLCJpYXQiOjE2Nzc1NDc4MDksImV4cCI6MTk5MjkwNzgwOX0.l0bezClGPysTa52gOfL3yCVxevsgHMQIDcrKVYQNGUY";
         when(request.getRequestURI()).thenReturn("");
         when(request.getMethod()).thenReturn("GET");
         when(request.getHeader("Authorization")).thenReturn("Bearer " + validToken);
@@ -90,7 +90,7 @@ public class JwtRequestFilterTest {
 
     @Test
     public void securityContextIsSetTest() throws Exception {
-        String validToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2M2VlNThhNzIxYjliYzc1Y2RlNzgyYTEiLCJhZGFfcm9sZXMiOlsiVVNFUiJdLCJpYXQiOjE2NzY1NjgxMzgsImV4cCI6MTY3NjY1NDUzOH0.rrvaKfwuy-PXsfUrsR9QZHJoiKxXyXWV27c11BMV9gY";
+        String validToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2M2VlNThhNzIxYjliYzc1Y2RlNzgyYTEiLCJhZGFfcm9sZXMiOlsiVVNFUiJdLCJpYXQiOjE2Nzc1NDc4MDksImV4cCI6MTk5MjkwNzgwOX0.l0bezClGPysTa52gOfL3yCVxevsgHMQIDcrKVYQNGUY";
         when(request.getRequestURI()).thenReturn("");
         when(request.getMethod()).thenReturn("GET");
         when(request.getHeader("Authorization")).thenReturn("Bearer " + validToken);
