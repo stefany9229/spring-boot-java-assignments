@@ -1,106 +1,103 @@
 package org.adaschool.api.security;
 
-import org.junit.jupiter.api.Assertions;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.adaschool.api.exception.TokenExpiredException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.core.GrantedAuthority;
+import org.mockito.MockitoAnnotations;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.TestPropertySource;
 
-import javax.servlet.FilterChain;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.List;
 
-import static org.adaschool.api.utils.Constants.MISSING_TOKEN_ERROR_MESSAGE;
-import static org.adaschool.api.utils.Constants.TOKEN_EXPIRED_MALFORMED_ERROR_MESSAGE;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.adaschool.api.utils.Constants.CLAIMS_ROLES_KEY;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
-@TestPropertySource(properties = {"spring.data.mongodb.uri=mongodb://localhost/testdb", "jwt.secret=secret"})
-public class JwtRequestFilterTest {
+class JwtRequestFilterTest {
 
-    private final JwtRequestFilter jwtRequestFilter = new JwtRequestFilter("secret");
     @Mock
-    private HttpServletRequest request;
-    @Mock
-    private HttpServletResponse response;
+    private JwtUtil jwtUtil;
+
     @Mock
     private FilterChain filterChain;
 
+    @Mock
+    private SecurityContext securityContext;
+
+    @InjectMocks
+    private JwtRequestFilter jwtRequestFilter;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+        SecurityContextHolder.setContext(securityContext);
+    }
+
     @Test
-    public void whenOptionsMethodRequestThenRespondsOkStatus() throws Exception {
-        when(request.getRequestURI()).thenReturn("");
-        when(request.getMethod()).thenReturn("OPTIONS");
-        jwtRequestFilter.doFilterInternal(request, response, filterChain);
-        verify(response).setStatus(HttpServletResponse.SC_OK);
+    void shouldAuthenticateWithValidToken() throws ServletException, IOException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        String token = "Bearer validToken";
+        request.addHeader("Authorization", token);
+
+        Claims claims = mock(Claims.class);
+        when(claims.getSubject()).thenReturn("user");
+        when(claims.get(CLAIMS_ROLES_KEY, List.class)).thenReturn(new ArrayList<>());
+        when(jwtUtil.extractAndVerifyClaims("validToken")).thenReturn(claims);
+        Method doFilterInternal = JwtRequestFilter.class.getDeclaredMethod("doFilterInternal", HttpServletRequest.class, HttpServletResponse.class, FilterChain.class);
+        doFilterInternal.setAccessible(true);
+        doFilterInternal.invoke(jwtRequestFilter, request, response, filterChain);
+
         verify(filterChain).doFilter(request, response);
+        verify(securityContext).setAuthentication(any());
     }
 
     @Test
-    public void whenRequestHasNoAuthorizationHeaderThenRespondsUnauthorizedStatus() throws Exception {
-        when(request.getRequestURI()).thenReturn("");
-        when(request.getMethod()).thenReturn("GET");
-        when(request.getHeader("Authorization")).thenReturn(null);
-        jwtRequestFilter.doFilterInternal(request, response, filterChain);
-        verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED, MISSING_TOKEN_ERROR_MESSAGE);
+    void shouldThrowExceptionWithExpiredToken() throws ServletException, IOException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        String token = "Bearer expiredToken";
+        request.addHeader("Authorization", token);
+
+        when(jwtUtil.extractAndVerifyClaims("expiredToken")).thenThrow(new ExpiredJwtException(null, null, "Token expired"));
+
+        Method doFilterInternal = JwtRequestFilter.class.getDeclaredMethod("doFilterInternal", HttpServletRequest.class, HttpServletResponse.class, FilterChain.class);
+        doFilterInternal.setAccessible(true);
+        try {
+            doFilterInternal.invoke(jwtRequestFilter, request, response, filterChain);
+        } catch (InvocationTargetException e) {
+            assertTrue(e.getCause() instanceof TokenExpiredException);
+        }
+        verify(filterChain, never()).doFilter(request, response);
+        verify(securityContext, never()).setAuthentication(any());
+    }
+
+    @Test
+    void shouldContinueChainWithNoAuthorizationHeader() throws ServletException, IOException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        Method doFilterInternal = JwtRequestFilter.class.getDeclaredMethod("doFilterInternal", HttpServletRequest.class, HttpServletResponse.class, FilterChain.class);
+        doFilterInternal.setAccessible(true);
+        doFilterInternal.invoke(jwtRequestFilter, request, response, filterChain);
+
         verify(filterChain).doFilter(request, response);
+        verify(securityContext, never()).setAuthentication(any());
     }
-
-    @Test
-    public void whenRequestHasNoBearerTokenThenRespondsUnauthorizedStatus() throws Exception {
-        when(request.getRequestURI()).thenReturn("");
-        when(request.getMethod()).thenReturn("GET");
-        when(request.getHeader("Authorization")).thenReturn("Token");
-        jwtRequestFilter.doFilterInternal(request, response, filterChain);
-        verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED, MISSING_TOKEN_ERROR_MESSAGE);
-        verify(filterChain).doFilter(request, response);
-    }
-
-    @Test
-    public void whenRequestHasInvalidTokenThenRespondsUnauthorized() throws Exception {
-        when(request.getRequestURI()).thenReturn("");
-        when(request.getMethod()).thenReturn("GET");
-        when(request.getHeader("Authorization")).thenReturn("Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2M2VlNThhNzIxYjliYzc1Y2RlNzgyYTEiLCJhZGFfcm9sZXMiOlsiVVNFUiJdLCJpYXQiOjE2NzY1NjQ2NzQsImV4cCI6MTY3NjY1MTA3NH0.I3KIIfVWLLMfSGv6AHwrYiZlEvHGC1gPmBolilKCJ1o");
-        jwtRequestFilter.doFilterInternal(request, response, filterChain);
-        verify(response).sendError(HttpServletResponse.SC_UNAUTHORIZED, TOKEN_EXPIRED_MALFORMED_ERROR_MESSAGE);
-        verify(filterChain).doFilter(request, response);
-    }
-
-    @Test
-    public void whenRequestHasValidTokenThenRespondsOK() throws Exception {
-        String validToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2M2VlNThhNzIxYjliYzc1Y2RlNzgyYTEiLCJhZGFfcm9sZXMiOlsiVVNFUiJdLCJpYXQiOjE2Nzc1NDc4MDksImV4cCI6MTk5MjkwNzgwOX0.rxTIuC1fkPY60BfQE85ouOrnq2M1W7s0jT1nZ6HGpro";
-        when(request.getRequestURI()).thenReturn("");
-        when(request.getMethod()).thenReturn("GET");
-        when(request.getHeader("Authorization")).thenReturn("Bearer " + validToken);
-        jwtRequestFilter.doFilterInternal(request, response, filterChain);
-        verify(response).setStatus(HttpServletResponse.SC_OK);
-        verify(filterChain).doFilter(request, response);
-    }
-
-    @Test
-    public void whenAuthRequestTheDoFilterIsCalled() throws Exception {
-        when(request.getRequestURI()).thenReturn("v1/auth");
-        jwtRequestFilter.doFilterInternal(request, response, filterChain);
-        verify(filterChain).doFilter(request, response);
-    }
-
-    @Test
-    public void securityContextIsSetTest() throws Exception {
-        String validToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2M2VlNThhNzIxYjliYzc1Y2RlNzgyYTEiLCJhZGFfcm9sZXMiOlsiVVNFUiJdLCJpYXQiOjE2Nzc1NDc4MDksImV4cCI6MTk5MjkwNzgwOX0.rxTIuC1fkPY60BfQE85ouOrnq2M1W7s0jT1nZ6HGpro";
-        when(request.getRequestURI()).thenReturn("");
-        when(request.getMethod()).thenReturn("GET");
-        when(request.getHeader("Authorization")).thenReturn("Bearer " + validToken);
-        jwtRequestFilter.doFilterInternal(request, response, filterChain);
-        String userId = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        Assertions.assertEquals(userId, "63ee58a721b9bc75cde782a1");
-        Collection<? extends GrantedAuthority> authorities = SecurityContextHolder.getContext().getAuthentication().getAuthorities();
-        String userRole = ((GrantedAuthority) ((ArrayList) authorities).get(0)).getAuthority();
-        Assertions.assertEquals(userRole, "ROLE_USER");
-
-    }
-
 }

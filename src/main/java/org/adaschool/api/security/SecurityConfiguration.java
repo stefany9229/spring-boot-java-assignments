@@ -1,38 +1,47 @@
 package org.adaschool.api.security;
 
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
 
-@EnableWebSecurity
-@EnableGlobalMethodSecurity(securedEnabled = true, jsr250Enabled = true, prePostEnabled = true)
-public class SecurityConfiguration
-        extends WebSecurityConfigurerAdapter {
+@Configuration
+@EnableMethodSecurity(securedEnabled = true, jsr250Enabled = true)
+public class SecurityConfiguration {
 
-    JwtRequestFilter jwtRequestFilter;
+    private final JwtRequestFilter jwtRequestFilter;
 
-    public SecurityConfiguration(@Autowired JwtRequestFilter jwtRequestFilter) {
+    private final JwtUserDetailsService userDetailsService;
+
+    public SecurityConfiguration(JwtRequestFilter jwtRequestFilter, JwtUserDetailsService userDetailsService) {
         this.jwtRequestFilter = jwtRequestFilter;
+        this.userDetailsService = userDetailsService;
     }
 
-    @Override
-    protected void configure(HttpSecurity http)
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(HttpSecurity httpSecurity)
             throws Exception {
-        http
-                .csrf().disable()
-                .cors().disable()
-                .authorizeRequests()
-                .antMatchers(HttpMethod.GET, "/health").permitAll()
-                .antMatchers(HttpMethod.POST, "/v1/auth").permitAll()
-                .anyRequest().authenticated()
-                .and().addFilterBefore(jwtRequestFilter, BasicAuthenticationFilter.class)
-                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        AuthenticationManagerBuilder authenticationManagerBuilder = httpSecurity.getSharedObject(AuthenticationManagerBuilder.class);
+        authenticationManagerBuilder.userDetailsService(userDetailsService)
+                .passwordEncoder(new BCryptPasswordEncoder());
+        return authenticationManagerBuilder.build();
     }
-}
 
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        //TODO implementar este Metodo
+        return http.build();
+    }
+
+
+}

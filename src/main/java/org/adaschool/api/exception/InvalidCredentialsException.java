@@ -1,10 +1,8 @@
 package org.adaschool.api.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+public class InvalidCredentialsException extends ServerErrorException {
 
-public class InvalidCredentialsException extends ResponseStatusException {
     public InvalidCredentialsException() {
-        super(HttpStatus.UNAUTHORIZED, "Invalid username or password");
+        super("invalid username or password");
     }
 }

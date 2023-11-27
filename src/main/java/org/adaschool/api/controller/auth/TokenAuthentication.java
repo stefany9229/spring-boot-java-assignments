@@ -1,5 +1,4 @@
-package org.adaschool.api.security;
-
+package org.adaschool.api.controller.auth;
 
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
@@ -41,11 +40,10 @@ public class TokenAuthentication
 
     @Override
     public Collection<GrantedAuthority> getAuthorities() {
-        return roles.stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).collect(
-                Collectors.toList());
+        return roles.stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .collect(Collectors.toList());
     }
 
 
 }
-
-
