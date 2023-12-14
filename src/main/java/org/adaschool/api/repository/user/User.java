@@ -31,6 +31,11 @@ public class User {
         this.createdAt = new Date();
     }
 
+    public User() {
+        this.id = null;
+        this.createdAt = new Date();
+    }
+
 
     public String getId() {
         return id;
